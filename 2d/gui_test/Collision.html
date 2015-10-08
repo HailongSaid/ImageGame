@@ -1,0 +1,281 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>simpleDemo</title>
+    <script type="text/javascript" src="../../wgeCore.js"></script>
+    <script type="text/javascript" src="../../wgeMatrix.js"></script>
+    <script type="text/javascript" src="../../wgeGUI.js"></script>
+    <script type="text/javascript" src="../wgeSprite.js"></script>
+
+</head>
+
+<body>
+
+    <script type="text/javascript">
+        "use strict";
+
+        var maxSpriteNum = 2000;
+        var runningSpriteNum = 5;
+
+        var MySprite = WGE.Class(WGE.Sprite,
+        {
+            dx: 0,
+            dy: 0,
+            drz: 0,
+            randomize: function () {
+                var w = this.img.width, h = this.img.height;
+
+                this.pos.data[0] = Math.random() * 1000;
+                this.pos.data[1] = Math.random() * 1000;
+                this.dx = Math.random() * 0.5 + 0.01;
+                this.dy = Math.random() * 0.5 + 0.01;
+                this.drz = Math.random() * 0.005 + 0.001;
+            },
+
+            update: function (dt, boundingX, boundingY) {
+                //移动
+                var d = this.pos.data;
+                d[0] += this.dx * dt;
+                d[1] += this.dy * dt;
+                this.rotate(this.drz * dt);
+
+                //反弹
+                if (d[0] < 0) {
+                    d[0] = 0;
+                    this.dx = -this.dx;
+                }
+                else if (d[0] > boundingX) {
+                    d[0] = boundingX;
+                    this.dx = -this.dx;
+                }
+
+                if (d[1] < 0) {
+                    d[1] = 0;
+                    this.dy = -this.dy;
+                }
+                else if (d[1] > boundingY) {
+                    d[1] = boundingY;
+                    this.dy = -this.dy;
+                }
+
+            }
+
+        });
+
+        var MyGUI = WGE.Class(WGE.GUIInterface,
+        {
+            context: undefined,
+            isMouseDown: false,
+            sprites: null,
+            deltaTime: 10,
+            x: 0,
+            y: 0,
+
+            bindFather: function (fatherObj) {
+                if (WGE.GUIInterface.bindFather.call(this, fatherObj));
+                {
+                    var context = this.canvas.getContext('2d');
+                    if (!context) {
+                        alert('你的浏览器不支持html5啊，坟蛋！换一个好吗？');
+                    }
+                    this.context = context;
+                    context.globalCompositeOperation = 'lighter';
+                    return !!this.context;
+                }
+                return false;
+            },
+
+            initSprites: function () {
+                var sprites = [];
+                var textures = [];
+                var context = this.context;
+                this.sprites = sprites;
+                for (var i = 0; i != 2; ++i) {
+                    var img = WGE.ID('test' + i);
+                    textures.push(img);
+                }
+
+                var posi = [];
+
+                for (var i = 0; i != maxSpriteNum; ++i) {
+                    //创建sprite
+                    var sprite = new MySprite(textures[parseInt(Math.random() * textures.length)], -1);
+                    //将sprite的描点设置为其中心点
+                    sprite.setHotspot2Center();
+                    sprite.alpha = 1.0 / maxSpriteNum + Math.random() * 0.2 + 0.1;
+                    sprite.randomize();
+                    sprites.push(sprite);
+                }
+
+
+                //设置每个sprite开始的位置不重叠
+                for (var i = 1; i < runningSpriteNum; i++) {
+                    var number = 0;
+                    while (1) {
+                        for (var j = 0; j < i; j++) {
+                            if (this.isCollide(sprites[i], sprites[j]))
+                                break;
+                            else
+                                number++;
+                        }
+                        if (number < i) {
+                            sprites[i].pos.data[0] = Math.random() * 1000;
+                            sprites[i].pos.data[1] = Math.random() * 1000;
+                            number = 0;
+                        }
+                        else
+                            break;
+                    }
+
+                }
+                sprites[0].alpha = 1.0;
+            },
+
+            spritesAlphaPlus: function (value) {
+                var sprites = this.sprites;
+                for (var i = 0; i < runningSpriteNum; ++i) {
+                    sprites[i].alpha = Math.max(Math.min(sprites[i].alpha + value, 1.0), 0.001);
+                }
+            },
+            pointInRect: function (point, rect) {
+                if ((point[0] >= rect.position[0] && point[0] <= rect.position[0] + rect.width) && (point[1] >= rect.position[1] && point[1] <= rect.position[1] + rect.height))
+                    return true;
+                return false;
+            },
+            isCollide: function (sprite1, sprite2) {
+                var self = this;
+                var point1 = [sprite1.pos.data[0], sprite1.pos.data[1]], point2 = [sprite2.pos.data[0], sprite2.pos.data[1]];
+                var width1 = sprite1.img.width, width2 = sprite2.img.width;
+                var height1 = sprite1.img.height, height2 = sprite2.img.height;
+                var pointAdd = function (po1, po2) {
+                    return [po1[0] + po2[0], po1[1] + po2[1]];
+                }
+                if (self.pointInRect(point1, { position: point2, width: width2, height: height2 }) ||
+                   self.pointInRect(pointAdd(point1, [width1, 0]), { position: point2, width: width2, height: height2 }) ||
+                   self.pointInRect(pointAdd(point1, [0, height1]), { position: point2, width: width2, height: height2 }) ||
+                    self.pointInRect(pointAdd(point1, [width1, height1]), { position: point2, width: width2, height: height2 })
+                    )
+                    return true;
+                return false;
+
+            },
+
+            exchangeSprite: function (sprite1, sprite2) {
+                var temp = sprite1.dx;
+                sprite1.dx = sprite2.dx;
+                sprite2.dx = temp;
+
+                var temp = sprite1.dy;
+                sprite1.dy = sprite2.dy;
+                sprite2.dy = temp;
+
+                var temp = sprite1.drz;
+                sprite1.drz = sprite2.drz;
+                sprite2.drz = temp;
+
+            },
+
+            //update用于更新数据
+            update: function (dt) {
+                this.deltaTime = dt;
+                var w = this.canvas.width, h = this.canvas.height;
+                var sprites = this.sprites;
+
+                for (var i = 0; i < runningSpriteNum - 1; i++) {
+                    for (var j = i + 1; j < runningSpriteNum; j++) {
+                        if (this.isCollide(sprites[i], sprites[j]))
+                            this.exchangeSprite(sprites[i], sprites[j]);
+                    }
+                }
+
+                for (var i = 1; i < runningSpriteNum; ++i) {
+                    sprites[i].update(dt, w, h);
+                }
+
+                sprites[0].moveTo(this.x, this.y);
+                sprites[0].rotate(sprites[0].drz * dt);
+            },
+
+            //render用于更新画面时用到，如果要其中update与render之间的时间关系设置在_run函数中实现。
+            render: function () {
+                var sprites = this.sprites;
+                var ctx = this.context;
+                ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                for (var i = 1; i < runningSpriteNum; ++i) {
+                    sprites[i].render(ctx);
+                }
+                sprites[0].render(this.context);
+            },
+
+            mouseMoveEvent: function (e, x, y) {
+                this.x = x;
+                this.y = y;
+            },
+
+            resizeEvent: function () {
+
+            }
+        });
+
+        var div = WGE.CE('div');
+        document.body.appendChild(div);
+        div.setAttribute('style', "width: 100%; height:100%;background-color:#000");
+        var gui = new MyGUI(div);
+
+        function updateSpritesAndFPS() {
+            WGE.ID('totalSprites').innerHTML = "Total Sprites: " + runningSpriteNum + "<br>" + "FPS " + (1000 / gui.deltaTime).toFixed(1);
+        }
+
+        document.body.setAttribute("onresize", "gui.onresize(event);");
+        document.body.setAttribute("onload", "gui.initSprites();gui.start();setInterval(updateSpritesAndFPS, 1000);");
+
+</script>
+
+    <div style="position: absolute; left: 10px; top: 10px; width: 170px; height: auto;">
+        <div style="width: 100%; height: 45px; background-color: #f00" id="totalSprites">
+            Initializing...
+        </div>
+        <script type="text/javascript">
+            function setBlend(mode) {
+                gui.context.globalCompositeOperation = mode;
+            }
+
+</script>
+        <input type="button" value="Sprite +10" style="width: 100px" onclick="runningSpriteNum += 10; if (runningSpriteNum > maxSpriteNum) runningSpriteNum = maxSpriteNum;"><br>
+        <input type="button" value="Sprite -10" style="width: 100px" onclick="runningSpriteNum -= 10; if (runningSpriteNum < 1) runningSpriteNum = 1;"><br>
+        <input type="button" value="Sprite +100" style="width: 100px" onclick="runningSpriteNum += 100; if (runningSpriteNum > maxSpriteNum) runningSpriteNum = maxSpriteNum;"><br>
+        <input type="button" value="Sprite -100" style="width: 100px" onclick="runningSpriteNum -= 100; if (runningSpriteNum < 1) runningSpriteNum = 1;"><br>
+        <input type="button" value="source-over" style="width: 100px" onclick="setBlend('source-over');"><br>
+        <input type="button" value="lighter" style="width: 100px" onclick="setBlend('lighter');"><br>
+        <input type="button" value="copy" style="width: 100px" onclick="setBlend('copy');"><br>
+        <input type="button" value="source-over" style="width: 100px" onclick="setBlend('source-over');"><br>
+        <input type="button" value="source-in" style="width: 100px" onclick="setBlend('source-in');"><br>
+        <input type="button" value="source-atop" style="width: 100px" onclick="setBlend('source-atop');"><br>
+        <input type="button" value="source-out" style="width: 100px" onclick="setBlend('source-out');"><br>
+        <input type="button" value="destination-over" style="width: 100px" onclick="setBlend('destination-over');"><br>
+        <input type="button" value="destination-in" style="width: 100px" onclick="setBlend('destination-in');"><br>
+        <input type="button" value="destination-out" style="width: 100px" onclick="setBlend('destination-out');"><br>
+        <input type="button" value="destination-atop" style="width: 100px" onclick="setBlend('destination-atop');"><br>
+        <br>
+        <input type="button" value="sprite alpha+" style="width: 100px" onclick="gui.spritesAlphaPlus(0.05);"><br>
+        <input type="button" value="sprite alpha-" style="width: 100px" onclick="gui.spritesAlphaPlus(-0.05);">
+    </div>
+
+    <div style="display: none">
+        <img src="../../res/png/0.png" id="test0">
+        <img src="../../res/png/1.png" id="test1">
+        <img src="../../res/png/2.png" id="test2">
+        <img src="../../res/png/3.png" id="test3">
+        <img src="../../res/png/4.png" id="test4">
+        <img src="../../res/png/5.png" id="test5">
+        <img src="../../res/png/6.png" id="test6">
+        <img src="../../res/png/7.png" id="test7">
+        <img src="../../res/png/8.png" id="test8">
+        <img src="../../res/png/9.png" id="test9">
+        <img src="../../res/png/10.png" id="test10">
+        <img src="../../res/png/11.png" id="test11">
+        <img src="../../res/png/12.png" id="test12">
+        <img src="../../res/png/13.png" id="test13">
+    </div>
+</body>
+</html>

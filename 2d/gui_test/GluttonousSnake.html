@@ -1,0 +1,279 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>js validation test</title>
+    <script type="text/javascript" src="../../wgeCore.js"></script>
+    <script type="text/javascript" src="../../wgeMatrix.js"></script>
+    <script type="text/javascript" src="../../wgeGUI.js"></script>
+    <script type="text/javascript" src="../wgeFilters.js"></script>
+    <script type="text/javascript" src="../wgeSprite.js"></script>
+
+</head>
+<body>
+    <p>时间：<span id="time">0</span></p>
+    <script type="text/javascript">
+
+
+        var myGUI = WGE.Class(WGE.GUIInterface,
+        {
+            context: undefined,
+            x: 0,
+            y: 0,
+            isMouseDown: false,
+            rectWidth: 40,
+            rectHeigth: 10,
+            food: null,
+            snake: null,
+            direction: 'd',
+            step: 10,
+            time: 0,
+            initialize: function (fatherObj) {
+                this.setupEvents();
+                this.bindFather(fatherObj);
+                this.canvas.width = 800;
+                this.canvas.height = 800;
+                this.context.fillStyle = "blue";
+                this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.context.stroke();
+                this.food = this.createFood();
+                this.drawFood(this.food);
+                this.snake = this.createSnake();
+                this.drawSnake(this.snake);
+
+            },
+            bindFather: function (fatherObj) {
+                if (WGE.GUIInterface.bindFather.call(this, fatherObj));
+                {
+                    this.context = this.canvas.getContext('2d');
+                    if (!this.context) {
+                        alert('你的浏览器不支持html5啊，坟蛋！换一个好吗？');
+                    }
+                    return !!this.context;
+                }
+                return false;
+            },
+            pointInRect: function (point, rect) {
+                if ((point[0] >= rect.position[0] && point[0] <= rect.position[0] + rect.width) && (point[1] >= rect.position[1] && point[1] <= rect.position[1] + rect.height))
+                    return true;
+                return false;
+            },
+            createFood: function () {
+                var self = this;
+                var food = {};
+                food.position = [Math.floor(Math.random() * this.canvas.width),
+                    Math.floor(Math.random() * this.canvas.height)];
+                food.size = [this.step, this.step];
+
+                food.includeInSnake = function (snake) {
+                    var pointAdd = function (po1, po2) {
+                        return [po1[0] + po2[0], po1[1] + po2[1]];
+                    }
+                    if (self.pointInRect(this.position, { position: snake.head, width: snake.step, height: snake.step }) ||
+                       self.pointInRect(pointAdd(this.position, [this.size[0], 0]), { position: snake.head, width: snake.step, height: snake.step }) ||
+                       self.pointInRect(pointAdd(this.position, [0, this.size[1]]), { position: snake.head, width: snake.step, height: snake.step }) ||
+                        self.pointInRect(pointAdd(this.position, this.size), { position: snake.head, width: snake.step, height: snake.step })
+                        )
+                        return true;
+                    for (var i = 0; i < snake.body.length; i++) {
+                        if (self.pointInRect(this.position, { position: snake.body[i], width: snake.step, height: snake.step }) ||
+                      self.pointInRect(pointAdd(this.position, [this.size[0], 0]), { position: snake.body[i], width: snake.step, height: snake.step }) ||
+                       self.pointInRect(pointAdd(this.position, [0, this.size[1]]), { position: snake.body[i], width: snake.step, height: snake.step }) ||
+                       self.pointInRect(pointAdd(this.position, this.size), { position: snake.body[i], width: snake.step, height: snake.step })
+                       )
+                            return true;
+                    }
+                    return false;
+                }
+                return food;
+            },
+            drawFood: function (food) {
+                this.context.fillStyle = "#f00";
+                this.context.fillRect(
+                    food.position[0], food.position[1],
+                    this.food.size[0], this.food.size[1]);
+                this.context.stroke();
+            },
+            createSnake: function (px, py) {
+                var self = this;
+                var snake = {};
+                snake.step = this.step;
+                if (arguments.length == 0) {
+                    px = snake.step * 2;
+                    py = 0;
+                }
+                snake.head = [px, py];
+                snake.direction = 'd';
+                snake.body = [];
+                snake.body.add = function (pos) {
+                    // snake.body.push(pos);
+                    snake.body[snake.body.length] = pos;
+                }
+                snake.body.add([px - snake.step, py]);
+                snake.body.add([px - 2 * snake.step, py]);
+
+                snake.update = function (dir) {
+                    for (var i = 0; i < this.body.length - 1; i++) {
+                        this.body[i][0] = this.body[i + 1][0];
+                        this.body[i][1] = this.body[i + 1][1];
+                        //console.log("第"+i+"个点" + this.body[i][0]+" , " + this.body[i][1]);
+                    }
+                    this.body[this.body.length - 1][0] = this.head[0];
+                    this.body[this.body.length - 1][1] = this.head[1];
+                    this.updateHead(dir);
+                    //console.log("000" + this.head[0] + " , " + this.head[1]);
+
+                }
+                snake.updateHead = function (dir) {
+                    if (this.head[0] > self.canvas.width)
+                        this.head[0] = -this.step;
+                    else if (this.head[0] < 0)
+                        this.head[0] = self.canvas.width;
+                    else if (this.head[1] < 0)
+                        this.head[1] = self.canvas.height;
+                    else if (this.head[1] > self.canvas.height)
+                        this.head[1] = -this.step;
+
+                    switch (dir) {
+                        case 'a':
+                            this.head[0] = this.head[0] - this.step;
+                            break;
+                        case 'd':
+                            this.head[0] = this.head[0] + this.step;
+                            break;
+                        case 'w':
+                            this.head[1] = this.head[1] - this.step;
+                            break;
+                        case 's':
+                            this.head[1] = this.head[1] + this.step;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                snake.isEatMyself = function () {
+                    var pointAdd = function (po1, po2) {
+                        return [po1[0] + po2[0], po1[1] + po2[1]];
+                    }
+                    for (var i = 0; i < this.body.length - 2; i++) {
+                        if (self.pointInRect(this.head, { position: this.body[i], width: this.step, height: this.step }) ||
+                       self.pointInRect(pointAdd(this.head, [this.step, 0]), { position: this.body[i], width: this.step, height: this.step }) ||
+                       self.pointInRect(pointAdd(this.head, [0, this.step]), { position: this.body[i], width: this.step, height: this.step }) ||
+                        self.pointInRect(pointAdd(this.head, [this.step, this.step]), { position: this.body[i], width: this.step, height: this.step })
+                       )
+                            return true;
+                    }
+                    return false;
+
+                }
+                return snake;
+            },
+            drawSnake: function (snake) {
+                this.context.fillStyle = "#f00";
+                this.context.fillRect(snake.head[0], snake.head[1], snake.step, snake.step);
+                this.context.stroke();
+                for (var i = 0; i < snake.body.length; i++) {
+                    this.context.fillRect(
+                         snake.body[i][0], snake.body[i][1],
+                         snake.step, snake.step);
+                    this.context.stroke();
+                }
+
+            },
+
+            //设置更新数据以及更新画面之间的时间关系
+            _run: function () {
+                if (!this.isStarted)
+                    return;
+                if (this._forceAutoResize) {
+                    this.onresize();
+                }
+
+                this.nowTime = Date.now();
+                var deltaTime = this.nowTime - this.lastTime;
+
+                this.time++;
+                document.getElementById("time").innerHTML = this.time;
+                this.update(deltaTime);
+                this.render(deltaTime);
+
+                this.lastTime = this.nowTime;
+                setTimeout(this._run.bind(this), 1000 / 8);
+            },
+
+            //更新数据时候用
+            update: function (deltaTime) {
+                this.snake.update(this.direction);
+
+                if (this.food.includeInSnake(this.snake)) {
+
+                    this.snake.body.add([this.snake.head[0], this.snake.head[1]]);
+                    this.snake.updateHead(this.direction);
+                    this.food = this.createFood();
+                }
+
+            },
+
+            //需要更新画面及画画时候用
+            render: function () {
+                var ctx = this.context;
+                var cvs = this.canvas;
+                ctx.clearRect(0, 0, cvs.width, cvs.height);
+                // ctx.clearRect(this.x, this.y, this.rectWidth, this.rectHeigth);
+
+                this.drawFood(this.food);
+                this.drawSnake(this.snake);
+                if (this.snake.isEatMyself()) {
+                    this.stop();
+                    alert("哈哈，你吃了你自己了！")
+                    // console.log("哈哈，你吃了你自己了！");
+                }
+
+            },
+
+            mouseDownEvent: function (e) {
+                this.isMouseDown = true;
+                this.x = e.offsetX || e.layerX;
+                this.y = e.offsetY || e.layerY;
+                this.snake = this.createSnake(this.x, this.y);
+                this.time = 0;
+                this.direction = 'd';
+            },
+
+            mouseUpEvent: function (e) {
+                this.isMouseDown = false;
+            },
+
+            mouseMoveEvent: function (e) {
+
+            },
+            onkeypress: function (e) {
+                var step = 10;
+                //e = (e) ? e : window.event;
+                // console.log(e.charCode + " , " + e.keyCode);
+                if (e.keyCode == 97||e.keyCode == 37) { //a
+                    this.direction = 'a';
+                }
+                else if (e.keyCode == 100||e.keyCode == 39) { //d
+                    this.direction = 'd';
+                }
+                else if (e.keyCode == 115||e.keyCode == 40) { //s
+                    this.direction = 's';
+                }
+                else if (e.keyCode == 119||e.keyCode == 38) { //w
+                    this.direction = 'w';
+                }
+
+            },
+
+        });
+
+        var gui = new myGUI(document.body);
+
+        //下面两句都是使整个ui大小跟随父元素变化，推荐前者。嫌麻烦或者跟已有代码有冲突（比如body的onresize有别的代码会随时更改）写成后者也没关系。
+        document.body.setAttribute("onresize", "gui.onresize(event);"); //较好
+        //gui.forceAutoResize(true); //这一句和上一句功能类似，这种方法可保证正确性
+
+        gui.start();
+</script>
+</body>
+</html>
